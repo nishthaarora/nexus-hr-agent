@@ -30,11 +30,15 @@ def chat(request: ChatRequest):
     summarized_history = summarize_if_needed(session["history"])
     session["history"] = summarized_history
     
-    answer = run_agent(session)
+    answer, tools_used = run_agent(session)
     session["history"].append(answer)
     save_history(session_id, session)
 
-    return {"answer": answer["content"][0]["text"], "session_id": session_id}
+    return {
+        "answer": answer["content"][0]["text"],
+        "session_id": session_id,
+        "tools_used": tools_used,
+    }
 
 @app.get("/history")
 def getHistory(session_id: str):

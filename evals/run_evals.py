@@ -44,7 +44,7 @@ passed = 0
 failed = 0
 
 print(f"\n{BOLD}{'═' * 60}{RESET}")
-print(f"{BOLD}  Nexus HR Copilot — Evaluation Suite{RESET}")
+print(f"{BOLD}  Nexus HR Agent — Evaluation Suite{RESET}")
 print(f"{BOLD}{'═' * 60}{RESET}")
 print(f"{DIM}  Running {total} test cases...{RESET}\n")
 
@@ -61,7 +61,7 @@ for i, question in enumerate(golden_dataset["questions"], 1):
     print(f"{BOLD}[{i}/{total}]{RESET} {question['question']}")
     print(f"{DIM}  Intent: {question['intent']}{RESET}")
 
-    answer = run_agent(session)
+    answer, _tools_used = run_agent(session)
     answer_text = answer["content"][0]["text"]
 
     print(f"{DIM}  Agent: {answer_text[:120]}{'...' if len(answer_text) > 120 else ''}{RESET}")
