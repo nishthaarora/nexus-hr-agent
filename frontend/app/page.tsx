@@ -1,19 +1,26 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 
 const API_URL = "http://127.0.0.1:8001";
-const SESSION_KEY = "copilot_session_id";
+const SESSION_KEY = "nexus_hr_session_id";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  toolsUsed?: string[];
 }
 
 interface BedrockMessage {
   role: "user" | "assistant";
   content: Array<{ text?: string; toolUse?: unknown; toolResult?: unknown }>;
 }
+
+const TOOL_LABELS: Record<string, string> = {
+  search_docs: "🔍 Searched documentation",
+  create_ticket: "🎫 Created a support ticket",
+};
 
 function extractText(msg: BedrockMessage): string | null {
   const text = msg.content.find((c) => c.text)?.text;
@@ -55,6 +62,12 @@ export default function Home() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  function startNewConversation() {
+    localStorage.removeItem(SESSION_KEY);
+    setSessionId(null);
+    setMessages([]);
+  }
+
   async function sendMessage() {
     const question = input.trim();
     if (!question || loading) return;
@@ -83,7 +96,7 @@ export default function Home() {
 
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: answerText },
+        { role: "assistant", content: answerText, toolsUsed: data.tools_used ?? [] },
       ]);
     } catch {
       setMessages((prev) => [
@@ -97,11 +110,17 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4">
-        <h1 className="text-xl font-semibold text-gray-800">
-          AI Operations Copilot
-        </h1>
-        <p className="text-sm text-gray-500">Ask questions about company docs</p>
+      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-800">Nexus HR Agent</h1>
+          <p className="text-sm text-gray-500">Ask questions about company docs</p>
+        </div>
+        <button
+          onClick={startNewConversation}
+          className="text-sm text-gray-500 border rounded-lg px-3 py-1.5 hover:bg-gray-100"
+        >
+          New conversation
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
@@ -113,16 +132,28 @@ export default function Home() {
         {messages.map((msg, i) => (
           <div
             key={i}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
           >
+            {msg.toolsUsed && msg.toolsUsed.length > 0 && (
+              <div className="flex gap-2 mb-1">
+                {msg.toolsUsed.map((tool) => (
+                  <span
+                    key={tool}
+                    className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5"
+                  >
+                    {TOOL_LABELS[tool] ?? tool}
+                  </span>
+                ))}
+              </div>
+            )}
             <div
-              className={`max-w-2xl px-4 py-3 rounded-2xl text-sm ${
+              className={`max-w-2xl px-4 py-3 rounded-2xl text-sm prose prose-sm ${
                 msg.role === "user"
-                  ? "bg-blue-600 text-white rounded-br-sm"
+                  ? "bg-blue-600 text-white rounded-br-sm prose-invert"
                   : "bg-white border text-gray-800 rounded-bl-sm"
               }`}
             >
-              {msg.content}
+              <ReactMarkdown>{msg.content}</ReactMarkdown>
             </div>
           </div>
         ))}
@@ -138,7 +169,11 @@ export default function Home() {
 
       <div className="bg-white border-t px-6 py-4">
         <div className="flex gap-3 max-w-4xl mx-auto">
+          <label htmlFor="chat-input" className="sr-only">
+            Ask a question
+          </label>
           <input
+            id="chat-input"
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
