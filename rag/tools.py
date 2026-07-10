@@ -1,3 +1,4 @@
+import random
 from rag.query import ask
 
 def create_ticket_tool_spec():
@@ -61,7 +62,7 @@ def search_docs_tool_spec():
 
 
 def create_ticket(title: str, description: str):
-    ticket_id = "TICKET-123456"
+    ticket_id = f"TICKET-{random.randint(100000, 999999)}"
     return {
         "ticket_id": ticket_id,
         "title": title,
