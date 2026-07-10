@@ -1,0 +1,64 @@
+{
+  "questions": [
+    {
+      "question": "How do I onboard as a new employee at Nexus HR?",
+      "expected": "New employees activate their account via a welcome email, complete their profile, enroll in benefits within 30 days, request equipment through IT, and complete mandatory training modules within the first two weeks.",
+      "intent": "documentation"
+    },
+    {
+      "question": "How many days of annual leave do I get?",
+      "expected": "Full-time employees accrue 20 days of annual leave per year, earned at 1.67 days per month.",
+      "intent": "documentation"
+    },
+    {
+      "question": "When do I get paid?",
+      "expected": "Nexus HR pays on a bi-weekly schedule. Salaries are deposited every second Friday. If a pay date falls on a public holiday, payment is made on the preceding Thursday.",
+      "intent": "documentation"
+    },
+    {
+      "question": "How do I reset my Nexus HR portal password?",
+      "expected": "Click Forgot Password on the login page and follow the instructions sent to your registered email. If you have lost access to your email, contact IT support or call 1-800-NEXUSHR.",
+      "intent": "documentation"
+    },
+    {
+      "question": "What is the maximum hotel limit when travelling for work?",
+      "expected": "Accommodation is reimbursed up to $200 per night. Any hotel above this limit requires director approval.",
+      "intent": "documentation"
+    },
+    {
+      "question": "How do I apply for parental leave?",
+      "expected": "Primary caregivers are entitled to 16 weeks of fully paid parental leave and secondary caregivers to 4 weeks. Notify HR at least 8 weeks in advance where possible.",
+      "intent": "documentation"
+    },
+    {
+      "question": "What happens to my system access when I resign?",
+      "expected": "All system access is revoked at 5pm on the last day of employment. Company email is deactivated 24 hours after the last day with a forwarding message set up for 30 days.",
+      "intent": "documentation"
+    },
+    {
+      "question": "How much does Nexus HR contribute to my 401k?",
+      "expected": "Nexus HR matches 100% of employee contributions up to 4% of salary. Employees are eligible to enroll after 90 days of employment.",
+      "intent": "documentation"
+    },
+    {
+      "question": "What is the stock price of Nexus HR?",
+      "expected": "NOT_IN_DOCS",
+      "intent": "documentation"
+    },
+    {
+      "question": "Create a support ticket for a payroll error on my last paycheck",
+      "expected": "A support ticket has been created for the payroll error.",
+      "intent": "support"
+    },
+    {
+      "question": "Create a ticket for a laptop that is not turning on",
+      "expected": "A support ticket has been created for the laptop hardware issue.",
+      "intent": "support"
+    },
+    {
+      "question": "What is the referral bonus if I refer someone who gets hired?",
+      "expected": "Employees receive a $1500 referral bonus if their referred candidate is hired and completes 90 days of employment. The bonus is paid in the next payroll cycle.",
+      "intent": "documentation"
+    }
+  ]
+}
