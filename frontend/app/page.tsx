@@ -5,11 +5,13 @@ import ReactMarkdown from "react-markdown";
 
 const API_URL = "http://127.0.0.1:8001";
 const SESSION_KEY = "nexus_hr_session_id";
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   toolsUsed?: string[];
+  isError?: boolean;
 }
 
 interface BedrockMessage {
@@ -37,6 +39,30 @@ function toDisplayMessages(bedrockMessages: BedrockMessage[]): Message[] {
     });
 }
 
+function extractErrorMessage(data: unknown): string {
+  const detail = (data as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail) && typeof (detail[0] as { msg?: unknown })?.msg === "string") {
+    return (detail[0] as { msg: string }).msg;
+  }
+  return "something went wrong. Please try again.";
+}
+
+function friendlyErrorFor(status: number, detail: string): string {
+  switch (status) {
+    case 401:
+      return "You're not authorized to use this assistant.";
+    case 413:
+      return "This conversation has grown too long for the model. Try starting a new conversation.";
+    case 422:
+      return detail;
+    case 429:
+      return "Too many requests right now — please wait a moment and try again.";
+    default:
+      return "Something went wrong on our end. Please try again.";
+  }
+}
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -48,7 +74,9 @@ export default function Home() {
     const stored = localStorage.getItem(SESSION_KEY);
     if (!stored) return;
     setSessionId(stored);
-    fetch(`${API_URL}/history?session_id=${stored}`)
+    fetch(`${API_URL}/history?session_id=${stored}`, {
+      headers: { "x-api-key": API_KEY },
+    })
       .then((r) => r.json())
       .then((data) => {
         if (data.history?.length) {
@@ -76,28 +104,119 @@ export default function Home() {
     setInput("");
     setLoading(true);
 
+    let assistantText = ""
+    let toolsUsedForTurn: string[]  = [];
+    let assistantMessageIndex: number | null = null;
+
+    function upsertAssistantMessage(content: string, isError = false) {
+      setMessages((prev) => {
+        if (assistantMessageIndex === null) {
+          assistantMessageIndex = prev.length;
+          return [...prev, { role: "assistant", content, toolsUsed: toolsUsedForTurn, isError }];
+        }
+        const next = [...prev];
+        next[assistantMessageIndex] = { role: "assistant", content, toolsUsed: toolsUsedForTurn, isError };
+        return next;
+      });
+    }
+
     try {
       const res = await fetch(`${API_URL}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
         body: JSON.stringify({ question, session_id: sessionId }),
       });
-      const data = await res.json();
 
-      if (data.session_id) {
-        setSessionId(data.session_id);
-        localStorage.setItem(SESSION_KEY, data.session_id);
+      if (!res.ok) {
+        // Non-2xx responses aren't guaranteed to have a JSON body — an
+        // unhandled backend exception returns a plain-text 500, which
+        // would throw if we called res.json() unconditionally.
+        let data: unknown = null;
+        try {
+          data = await res.json();
+        } catch {
+          // body wasn't JSON (e.g. plain-text 500); fall back below.
+        }
+        const detail = data ? extractErrorMessage(data) : "Something went wrong on our end. Please try again.";
+        setMessages((prev) => [...prev, { role: "assistant", content: friendlyErrorFor(res.status, detail), isError: true }]);
+        return;
       }
 
-      const answerText =
-        typeof data.answer === "string"
-          ? data.answer
-          : data.answer?.content?.[0]?.text ?? "No response";
+      if (!res.body) {
+        throw new Error("No response body to stream");
+      }
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: answerText, toolsUsed: data.tools_used ?? [] },
-      ]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE frames are separated by a blank line ("\n\n").
+        let frameEnd: number;
+        while ((frameEnd = buffer.indexOf("\n\n")) !== -1) {
+          const frame = buffer.slice(0, frameEnd);
+          buffer = buffer.slice(frameEnd + 2);
+
+          let eventName = "message";
+          let dataLine = "";
+          for (const line of frame.split("\n")) {
+            if (line.startsWith("event: ")) eventName = line.slice(7);
+            else if (line.startsWith("data: ")) dataLine = line.slice(6);
+          }
+          if (!dataLine) continue;
+
+          let payload: {
+            session_id?: string;
+            text?: string;
+            tool_name?: string;
+            detail?: string;
+          };
+          try {
+            payload = JSON.parse(dataLine);
+          } catch {
+            continue;
+          }
+
+          switch (eventName) {
+            case "session_id":
+              if (payload.session_id) {
+                setSessionId(payload.session_id);
+                localStorage.setItem(SESSION_KEY, payload.session_id);
+              }
+              break;
+            case "text_chunk":
+              assistantText += payload.text ?? "";
+              upsertAssistantMessage(assistantText);
+              break;
+            case "tool_use":
+              if (payload.tool_name && !toolsUsedForTurn.includes(payload.tool_name)) {
+                toolsUsedForTurn = [...toolsUsedForTurn, payload.tool_name];
+                upsertAssistantMessage(assistantText);
+              }
+              break;
+            case "message_end":
+              break;
+            case "max_tokens_reached":
+            case "rate_limited":
+            case "context_too_large":
+            case "error":
+              upsertAssistantMessage(payload.detail ?? "Something went wrong on our end. Please try again.", true);
+              break;
+            default:
+              break;
+          }
+        }
+      }
+
+      if (assistantMessageIndex === null) {
+        // Stream ended without any text_chunk (e.g. a tool-only turn).
+        upsertAssistantMessage("No response");
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -147,11 +266,13 @@ export default function Home() {
               </div>
             )}
             <div
-              className={`max-w-2xl px-4 py-3 rounded-2xl text-sm prose prose-sm ${
-                msg.role === "user"
-                  ? "bg-blue-600 text-white rounded-br-sm prose-invert"
-                  : "bg-white border text-gray-800 rounded-bl-sm"
-              }`}
+            className={`max-w-2xl px-4 py-3 rounded-2xl text-sm prose prose-sm ${
+              msg.role === "user"
+                ? "bg-blue-600 text-white rounded-br-sm prose-invert"
+                : msg.isError
+                ? "bg-red-50 border border-red-200 text-red-700 rounded-bl-sm"
+                : "bg-white border text-gray-800 rounded-bl-sm"
+            }`}
             >
               <ReactMarkdown>{msg.content}</ReactMarkdown>
             </div>

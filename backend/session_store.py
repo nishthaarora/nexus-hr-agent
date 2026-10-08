@@ -1,12 +1,14 @@
 
 import os
 import json
-import boto3
 from dotenv import load_dotenv
 from rag.skills import SKILLS
+from rag.bedrock_client import get_bedrock_client
+from rag.exceptions import translate_client_error
+from botocore.exceptions import ClientError
 load_dotenv()
 
-client = boto3.client("bedrock-runtime")
+client = get_bedrock_client()
 
 SESSIONS_DIR = 'sessions'
 
@@ -50,9 +52,12 @@ def load_or_create_session(session_id, content_message=None):
     
 def get_intent(question):
     skills = ', '.join(SKILLS.keys())
-    response = client.converse(
-        modelId="us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        messages=[{"role": "user", "content": [{"text": question}]}],
-        system=[{"text": f"Classify the intent as one of these skills: {skills}. Reply with only the skill name."}],
-    )
-    return response["output"]["message"]["content"][0]["text"]
+    try:
+        response = client.converse(
+            modelId="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            messages=[{"role": "user", "content": [{"text": question}]}],
+            system=[{"text": f"You are an intent classifier. Classify the user message into exactly one of these intents: {skills}. Use 'support' if the user wants to create, submit, log, or raise a ticket or report an issue. Use 'documentation' for all other questions about HR policies, leave, payroll, benefits, onboarding, or any information lookup. Reply with only the intent name, nothing else."}],
+        )
+        return response["output"]["message"]["content"][0]["text"].strip().lower()
+    except ClientError as exc:
+        raise translate_client_error(exc) from exc

@@ -4,6 +4,7 @@ import uuid
 from rag.skills import SKILLS
 from dotenv import load_dotenv
 import boto3
+import os
 import time
 
 load_dotenv()
@@ -17,7 +18,7 @@ RESET = "\033[0m"
 DIM = "\033[2m"
 
 def judge(answer, expected):
-    client = boto3.client("bedrock-runtime")
+    client = boto3.client("bedrock-runtime", region_name=os.getenv("AWS_REGION"))
 
     if expected == "NOT_IN_DOCS":
         system_prompt = "The expected answer is NOT_IN_DOCS meaning the agent should say it does not have the information. Reply PASS if the agent says it doesn't know or can't find the information, FAIL otherwise."

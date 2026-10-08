@@ -1,6 +1,19 @@
 import random
 from rag.query import ask
 
+
+TOOL_REGISTRY: dict[str, callable] = {}
+TOOL_SPECS: dict[str, dict] = {}
+
+def register_tool(spec_fn):
+    def decorator(fn):
+        spec = spec_fn()
+        name = spec["toolSpec"]["name"]
+        TOOL_REGISTRY[name] = fn
+        TOOL_SPECS[name] = spec
+        return fn
+    return decorator
+
 def create_ticket_tool_spec():
     """
     Returns the JSON Schema specification for the Weather tool. The tool specification
@@ -32,6 +45,7 @@ def create_ticket_tool_spec():
         }
     }
 
+
 def search_docs_tool_spec():
     """
     Returns the JSON Schema specification for the Weather tool. The tool specification
@@ -60,7 +74,7 @@ def search_docs_tool_spec():
     }
     
 
-
+@register_tool(create_ticket_tool_spec)
 def create_ticket(title: str, description: str):
     ticket_id = f"TICKET-{random.randint(100000, 999999)}"
     return {
@@ -70,6 +84,7 @@ def create_ticket(title: str, description: str):
         "status": "created",
     }
     
+@register_tool(search_docs_tool_spec)
 def search_docs(query: str):
     answer = ask(query)
     return {"result": answer}

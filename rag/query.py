@@ -1,8 +1,8 @@
-import boto3
 import json
 import chromadb
 from dotenv import load_dotenv
 import os
+from rag.bedrock_client import get_bedrock_client
 
 load_dotenv()
 MODEL_ID = os.getenv("MODEL_ID")
@@ -11,7 +11,7 @@ collection = client.get_collection("nexus_hr_docs")
 
 
 def get_embedding(user_query):
-    client = boto3.client("bedrock-runtime")
+    client = get_bedrock_client()
     response = client.invoke_model(
         modelId="amazon.titan-embed-text-v2:0",
         body=json.dumps({
@@ -30,7 +30,7 @@ def query_rag(embedded_query):
     return results
 
 def generate_response(user_query):
-    client = boto3.client("bedrock-runtime")
+    client = get_bedrock_client()
     response = client.invoke_model(
         modelId=MODEL_ID,
         body=json.dumps({

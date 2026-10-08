@@ -1,5 +1,5 @@
 import os
-import boto3
+from rag.bedrock_client import get_bedrock_client
 import chromadb
 from dotenv import load_dotenv
 from datetime import datetime
@@ -22,7 +22,7 @@ def chunk_text(text, chunk_size=500, overlap=10):
     return splitter.split_text(text)
 
 def embed_text(text):
-    client = boto3.client("bedrock-runtime")
+    client = get_bedrock_client()
     response = client.invoke_model(
         modelId="amazon.titan-embed-text-v2:0",
         body=json.dumps({
